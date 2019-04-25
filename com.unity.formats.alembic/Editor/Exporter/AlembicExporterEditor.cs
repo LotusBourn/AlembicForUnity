@@ -1,9 +1,6 @@
 using System;
 using System.IO;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine.Formats.Alembic.Exporter;
 using UnityEngine.Formats.Alembic.Sdk;
 using UnityEngine.Formats.Alembic.Util;
@@ -20,136 +17,12 @@ namespace UnityEditor.Formats.Alembic.Exporter
         public override void OnInspectorGUI()
         {
             var t = target as AlembicExporter;
-            var recorder = t.recorder;
-            var settings = recorder.settings;
-            var so = serializedObject;
-
-            bool dirty = false;
-            var pathSettings = "m_recorder.m_settings.";
-
-            // output path
-            GUILayout.Space(5);
-            EditorGUILayout.LabelField("Output Path", EditorStyles.boldLabel);
-            {
-                EditorGUILayout.BeginHorizontal();
-
-                EditorGUI.BeginChangeCheck();
-                settings.OutputPath = EditorGUILayout.TextField(settings.OutputPath);
-                if (EditorGUI.EndChangeCheck())
-                    dirty = true;
-
-                if (GUILayout.Button("...", GUILayout.Width(24)))
-                {
-                    var dir = "";
-                    var filename = "";
-                    try
-                    {
-                        dir = Path.GetDirectoryName(settings.OutputPath);
-                        filename = Path.GetFileName(settings.OutputPath);
-                    }
-                    catch (Exception) { }
-
-                    var path = EditorUtility.SaveFilePanel("Output Path", dir, filename, "abc");
-                    if (path.Length > 0)
-                    {
-                        settings.OutputPath = path;
-                        dirty = true;
-                    }
-                }
-                EditorGUILayout.EndHorizontal();
-            }
-            GUILayout.Space(5);
-
-
-            // alembic settings
-            EditorGUILayout.LabelField("Alembic Settings", EditorStyles.boldLabel);
-            {
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "conf.archiveType"));
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "conf.xformType"));
-                var timeSamplingType = so.FindProperty(pathSettings + "conf.timeSamplingType");
-                EditorGUILayout.PropertyField(timeSamplingType);
-                if (timeSamplingType.intValue == (int)aeTimeSamplingType.Uniform)
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "conf.frameRate"));
-                    EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "fixDeltaTime"));
-                    EditorGUI.indentLevel--;
-                }
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "conf.swapHandedness"));
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "conf.swapFaces"));
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "conf.scaleFactor"));
-            }
-            GUILayout.Space(5);
-
-
-            // capture settings
-            EditorGUILayout.LabelField("Capture Settings", EditorStyles.boldLabel);
-            var scope = so.FindProperty(pathSettings + "scope");
-            EditorGUILayout.PropertyField(scope);
-            if (scope.intValue == (int)ExportScope.TargetBranch)
-            {
-                EditorGUI.indentLevel++;
-                EditorGUI.BeginChangeCheck();
-                settings.TargetBranch = EditorGUILayout.ObjectField("Target", settings.TargetBranch, typeof(GameObject), true) as GameObject;
-                if (EditorGUI.EndChangeCheck())
-                    dirty = true;
-                EditorGUI.indentLevel--;
-            }
-            EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "assumeNonSkinnedMeshesAreConstant"), new GUIContent("Static MeshRenderers"));
-            GUILayout.Space(5);
-
-            m_foldCaptureComponents = EditorGUILayout.Foldout(m_foldCaptureComponents, "Capture Components");
-            if (m_foldCaptureComponents)
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "captureMeshRenderer"), new GUIContent("MeshRenderer"));
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "captureSkinnedMeshRenderer"), new GUIContent("SkinnedMeshRenderer"));
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "captureCamera"), new GUIContent("Camera"));
-                EditorGUI.indentLevel--;
-            }
-
-            m_foldMeshComponents = EditorGUILayout.Foldout(m_foldMeshComponents, "Mesh Components");
-            if (m_foldMeshComponents)
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "meshNormals"), new GUIContent("Normals"));
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "meshUV0"), new GUIContent("UV 1"));
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "meshUV1"), new GUIContent("UV 2"));
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "meshColors"), new GUIContent("Vertex Color"));
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "meshSubmeshes"), new GUIContent("Submeshes"));
-                EditorGUI.indentLevel--;
-            }
-            {
-                var m_captureOnStart = so.FindProperty("m_captureOnStart");
-                EditorGUILayout.PropertyField(m_captureOnStart);
-                if (m_captureOnStart.boolValue)
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(so.FindProperty("m_ignoreFirstFrame"));
-                    EditorGUI.indentLevel--;
-                }
-                EditorGUILayout.PropertyField(so.FindProperty("m_maxCaptureFrame"));
-            }
-            GUILayout.Space(5);
-
-            // misc settigs
-            EditorGUILayout.LabelField("Misc", EditorStyles.boldLabel);
-            {
-                EditorGUILayout.PropertyField(so.FindProperty(pathSettings + "detailedLog"));
-            }
-            GUILayout.Space(10);
-
-            so.ApplyModifiedProperties();
-            if (dirty)
-            {
-                EditorUtility.SetDirty(target);
-                EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-            }
-
+            var settingsProp = serializedObject.FindProperty("m_recorder.m_settings");
+            DrawRecorderSettings(serializedObject, settingsProp,ref m_foldCaptureComponents, ref m_foldMeshComponents);
 
             // capture control
             EditorGUILayout.LabelField("Capture Control", EditorStyles.boldLabel);
-            if (recorder.recording)
+            if (t.recorder.recording)
             {
                 if (GUILayout.Button("End Recording"))
                     t.EndRecording();
@@ -162,6 +35,133 @@ namespace UnityEditor.Formats.Alembic.Exporter
                 if (GUILayout.Button("One Shot"))
                     t.OneShot();
             }
+        }
+
+        internal static void DrawRecorderSettings(SerializedObject so, SerializedProperty settingsProp, ref bool foldCaptureComponents, ref bool foldMeshComponents)
+        {
+            var outputPathProperty = settingsProp.FindPropertyRelative("outputPath");
+
+            // output path
+            GUILayout.Space(5);
+            EditorGUILayout.LabelField("Output Path", EditorStyles.boldLabel);
+            {
+                EditorGUILayout.BeginHorizontal();
+
+                EditorGUI.BeginChangeCheck();
+                var s = EditorGUILayout.TextField(outputPathProperty.stringValue);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    outputPathProperty.stringValue = s;
+                }
+                
+
+                if (GUILayout.Button("...", GUILayout.Width(24)))
+                {
+                    var dir = "";
+                    var filename = "";
+                    try
+                    {
+                        dir = Path.GetDirectoryName(outputPathProperty.stringValue);
+                        filename = Path.GetFileName(outputPathProperty.stringValue);
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
+                    }
+
+                    var path = EditorUtility.SaveFilePanel("Output Path", dir, filename, "abc");
+                    if (path.Length > 0)
+                    {
+                        outputPathProperty.stringValue = path;
+                    }
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+            GUILayout.Space(5);
+
+
+            // alembic settings
+            EditorGUILayout.LabelField("Alembic Settings", EditorStyles.boldLabel);
+            {
+                var confProperty = settingsProp.FindPropertyRelative("conf");
+                EditorGUILayout.PropertyField(confProperty.FindPropertyRelative("archiveType"));
+                EditorGUILayout.PropertyField(confProperty.FindPropertyRelative("xformType"));
+                var timeSamplingType = confProperty.FindPropertyRelative("timeSamplingType");
+                EditorGUILayout.PropertyField(timeSamplingType);
+                if (timeSamplingType.intValue == (int)aeTimeSamplingType.Uniform)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(confProperty.FindPropertyRelative("frameRate"));
+                    EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("fixDeltaTime"));
+                    EditorGUI.indentLevel--;
+                }
+                EditorGUILayout.PropertyField(confProperty.FindPropertyRelative("swapHandedness"));
+                EditorGUILayout.PropertyField(confProperty.FindPropertyRelative("swapFaces"));
+                EditorGUILayout.PropertyField(confProperty.FindPropertyRelative("scaleFactor"));
+            }
+            GUILayout.Space(5);
+
+
+            // capture settings
+            EditorGUILayout.LabelField("Capture Settings", EditorStyles.boldLabel);
+            var scope = settingsProp.FindPropertyRelative("scope");
+            EditorGUILayout.PropertyField(scope);
+            if (scope.intValue == (int)ExportScope.TargetBranch)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUI.BeginChangeCheck();
+                var targetBranch = so.FindProperty("m_recorder.m_settings.targetBranch");
+                var branch = EditorGUILayout.ObjectField("Target", targetBranch.objectReferenceValue, typeof(GameObject), true) as GameObject;
+                if (EditorGUI.EndChangeCheck())
+                {
+                    targetBranch.objectReferenceValue = branch;
+                }
+                EditorGUI.indentLevel--;
+            }
+            EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("assumeNonSkinnedMeshesAreConstant"), new GUIContent("Static MeshRenderers"));
+            GUILayout.Space(5);
+
+            foldCaptureComponents = EditorGUILayout.Foldout(foldCaptureComponents, "Capture Components");
+            if (foldCaptureComponents)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("captureMeshRenderer"), new GUIContent("MeshRenderer"));
+                EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("captureSkinnedMeshRenderer"), new GUIContent("SkinnedMeshRenderer"));
+                EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("captureCamera"), new GUIContent("Camera"));
+                EditorGUI.indentLevel--;
+            }
+
+            foldMeshComponents = EditorGUILayout.Foldout(foldMeshComponents, "Mesh Components");
+            if (foldMeshComponents)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("meshNormals"), new GUIContent("Normals"));
+                EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("meshUV0"), new GUIContent("UV 1"));
+                EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("meshUV1"), new GUIContent("UV 2"));
+                EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("meshColors"), new GUIContent("Vertex Color"));
+                EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("meshSubmeshes"), new GUIContent("Submeshes"));
+                EditorGUI.indentLevel--;
+            }
+            {
+                var mCaptureOnStart = so.FindProperty("m_captureOnStart");
+                EditorGUILayout.PropertyField(mCaptureOnStart);
+                if (mCaptureOnStart.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(so.FindProperty("m_ignoreFirstFrame"));
+                    EditorGUI.indentLevel--;
+                }
+                EditorGUILayout.PropertyField(so.FindProperty("m_maxCaptureFrame"));
+            }
+            GUILayout.Space(5);
+
+            // misc settings
+            EditorGUILayout.LabelField("Misc", EditorStyles.boldLabel);
+            {
+                EditorGUILayout.PropertyField(settingsProp.FindPropertyRelative("detailedLog"));
+            }
+            GUILayout.Space(10);
+            so.ApplyModifiedProperties();
         }
     }
 }
